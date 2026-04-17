@@ -33,7 +33,8 @@ export default function App() {
   const [learnText, setLearnText] = useState('Klik op mij!');
   
   // Puzzel state
-  const [placedPieces, setPlacedPieces] = useState([]);
+  const [placedPieces, setPlacedPieces] = useState<string[]>([]);
+  const [isDraggingPuzzle, setIsDraggingPuzzle] = useState(false);
 
   // Anti-zoom en scroll voor mobiel (native app feel)
   useEffect(() => {
@@ -113,10 +114,21 @@ export default function App() {
   };
 
   const nextQuestion = useCallback((previousTargetId = null) => {
-    let availableParts = BODY_PARTS;
+    let activeParts = [{ id: 'hoofd', name: 'het hoofd' }, ...BODY_PARTS.filter(p => p.id !== 'haar' && p.id !== 'neus' && p.id !== 'mond' && p.id !== 'oor')];
+    if (character === 'tom_hoofd') {
+      activeParts = [
+        { id: 'haar', name: 'het haar' },
+        { id: 'oog', name: 'het oog' },
+        { id: 'neus', name: 'de neus' },
+        { id: 'mond', name: 'de mond' },
+        { id: 'oor', name: 'het oor' },
+      ];
+    }
+
+    let availableParts = activeParts;
     if (previousTargetId) {
       // Voorkom direct dezelfde vraag twee keer na elkaar
-      availableParts = BODY_PARTS.filter(p => p.id !== previousTargetId);
+      availableParts = activeParts.filter(p => p.id !== previousTargetId);
     }
     
     const randomPart = availableParts[Math.floor(Math.random() * availableParts.length)];
@@ -152,7 +164,11 @@ export default function App() {
       return;
     }
 
-    const clickedPartObj = BODY_PARTS.find(p => p.id === partId);
+    const activePartsForClick = character === 'tom_hoofd' 
+      ? [ {id: 'haar', name: 'het haar'}, {id: 'oog', name: 'het oog'}, {id: 'neus', name: 'de neus'}, {id: 'mond', name: 'de mond'}, {id: 'oor', name: 'het oor'} ]
+      : [ { id: 'hoofd', name: 'het hoofd' }, ...BODY_PARTS.filter(p => !['haar','neus','mond','oor'].includes(p.id)) ];
+    
+    const clickedPartObj = activePartsForClick.find(p => p.id === partId);
     const clickedPartName = clickedPartObj ? clickedPartObj.name : 'dat';
 
     if (gameMode === 'learn') {
@@ -193,14 +209,18 @@ export default function App() {
   };
 
   const handlePuzzleDrop = () => {
-    const currentPiece = PUZZLE_PIECES[placedPieces.length];
+    const activePuzzlePieces = character === 'tom_hoofd' 
+      ? [ {id: 'haar', name: 'het haar'}, {id: 'oog', name: 'het oog'}, {id: 'neus', name: 'de neus'}, {id: 'mond', name: 'de mond'}, {id: 'oor', name: 'het oor'} ]
+      : PUZZLE_PIECES;
+
+    const currentPiece = activePuzzlePieces[placedPieces.length];
     const newPlaced = [...placedPieces, currentPiece.id];
     setPlacedPieces(newPlaced);
     
     const complimenten = ['Jep!', 'Past!', 'Mooi zo!', 'Knap!'];
     speak(complimenten[Math.floor(Math.random() * complimenten.length)]);
 
-    if (newPlaced.length === PUZZLE_PIECES.length) {
+    if (newPlaced.length === activePuzzlePieces.length) {
       setTimeout(() => {
         speak('Hoera! De puzzel is klaar!');
         setGameState('celebration');
@@ -307,13 +327,13 @@ export default function App() {
               </button>
 
               <button 
-                onClick={() => selectCharacter('beer')} 
-                className="btn-3d bg-white p-3 rounded-3xl border-amber-300 border-x-2 border-t-2 border-b-amber-400 hover:bg-amber-50 flex items-center justify-between"
+                onClick={() => selectCharacter('tom_hoofd')} 
+                className="btn-3d bg-white p-3 rounded-3xl border-emerald-300 border-x-2 border-t-2 border-b-emerald-400 hover:bg-emerald-50 flex items-center justify-between"
               >
-                <div className="w-16 h-16 bg-amber-100 rounded-2xl overflow-hidden flex items-center justify-center border-2 border-amber-200">
-                  <div className="w-full h-full pt-4 pointer-events-none"><KidSVG character="beer" isIcon={true} viewBoxOverride="20 0 160 120" /></div>
+                <div className="w-16 h-16 bg-emerald-100 rounded-2xl overflow-hidden flex items-center justify-center border-2 border-emerald-200">
+                  <div className="w-full h-full pt-4 pointer-events-none"><KidSVG character="tom_hoofd" isIcon={true} viewBoxOverride="40 0 120 120" /></div>
                 </div>
-                <span className="text-2xl font-extrabold text-gray-700 mr-6">Bram</span>
+                <span className="text-2xl font-extrabold text-gray-700 mr-6">Tom Hoofd</span>
               </button>
             </div>
           </div>
@@ -412,21 +432,30 @@ export default function App() {
                 highlightedPart={highlightedPart}
                 puzzleMode={gameMode === 'puzzle'}
                 placedPieces={placedPieces}
+                viewBoxOverride={character === 'tom_hoofd' ? (gameMode === 'puzzle' ? "15 -20 170 170" : "15 -20 170 170") : null}
               />
               {/* Grond/Schaduw visual box onder de voetjes */}
               <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-sky-400/30 to-transparent -z-10 pointer-events-none" />
             </div>
 
             {/* Draggable Puzzelstukje (alleen in puzzle modus, vast beneden) */}
-            {gameMode === 'puzzle' && placedPieces.length < PUZZLE_PIECES.length && (
-              <div className="absolute bottom-0 left-0 right-0 h-40 bg-white/60 backdrop-blur-sm rounded-t-[3rem] border-t-4 border-purple-200 flex justify-center items-center z-40 pb-4 shadow-[0_-10px_20px_rgba(0,0,0,0.05)]">
-                <DraggablePiece 
-                  pieceId={PUZZLE_PIECES[placedPieces.length].id} 
-                  pieceName={PUZZLE_PIECES[placedPieces.length].name}
-                  character={character} 
-                  onDrop={handlePuzzleDrop} 
-                  speak={speak}
-                />
+            {gameMode === 'puzzle' && placedPieces.length < (character === 'tom_hoofd' ? 5 : PUZZLE_PIECES.length) && (
+              <div className={`absolute bottom-0 left-0 right-0 h-40 flex justify-center items-center z-40 pb-4 ${isDraggingPuzzle ? 'pointer-events-none' : ''}`}>
+                <div className={`absolute inset-0 bg-white/60 backdrop-blur-sm rounded-t-[3rem] border-t-4 border-purple-200 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] transition-opacity duration-300 pointer-events-none ${isDraggingPuzzle ? 'opacity-0' : 'opacity-100'}`} />
+                <div className="pointer-events-auto">
+                  <DraggablePiece 
+                    pieceId={character === 'tom_hoofd' 
+                      ? [ {id: 'haar', name: 'het haar'}, {id: 'oog', name: 'het oog'}, {id: 'neus', name: 'de neus'}, {id: 'mond', name: 'de mond'}, {id: 'oor', name: 'het oor'} ][placedPieces.length].id 
+                      : PUZZLE_PIECES[placedPieces.length].id} 
+                    pieceName={character === 'tom_hoofd' 
+                      ? [ {id: 'haar', name: 'het haar'}, {id: 'oog', name: 'het oog'}, {id: 'neus', name: 'de neus'}, {id: 'mond', name: 'de mond'}, {id: 'oor', name: 'het oor'} ][placedPieces.length].name 
+                      : PUZZLE_PIECES[placedPieces.length].name}
+                    character={character} 
+                    onDrop={handlePuzzleDrop} 
+                    speak={speak}
+                    onDragStateChange={setIsDraggingPuzzle}
+                  />
+                </div>
               </div>
             )}
 
@@ -487,7 +516,7 @@ export default function App() {
 // ==========================================
 // DRAGGABLE PUZZELSTUK COMPONENT
 // ==========================================
-const DraggablePiece = ({ pieceId, pieceName, character, onDrop, speak }) => {
+const DraggablePiece = ({ pieceId, pieceName, character, onDrop, speak, onDragStateChange }: any) => {
   const [renderPos, setRenderPos] = useState({ x: 0, y: 0 });
   const startPos = useRef({ x: 0, y: 0 });
   const isDragging = useRef(false);
@@ -497,6 +526,7 @@ const DraggablePiece = ({ pieceId, pieceName, character, onDrop, speak }) => {
     isDragging.current = true;
     startPos.current = { x: e.clientX - renderPos.x, y: e.clientY - renderPos.y };
     speak(pieceName); // Lees voor wat we vastpakken
+    if (onDragStateChange) onDragStateChange(true);
   };
 
   const handlePointerMove = (e) => {
@@ -509,6 +539,7 @@ const DraggablePiece = ({ pieceId, pieceName, character, onDrop, speak }) => {
 
   const handlePointerUp = (e) => {
     isDragging.current = false;
+    if (onDragStateChange) onDragStateChange(false);
     // Visuele marge: als het stukje uit de witte opvangbak onderaan is gesleept (y < -120px) klopt het
     if (renderPos.y < -120) {
       onDrop();
@@ -517,13 +548,18 @@ const DraggablePiece = ({ pieceId, pieceName, character, onDrop, speak }) => {
     setRenderPos({ x: 0, y: 0 });
   };
 
-  const viewBoxes = {
+  const viewBoxes: any = {
     'hoofd': "30 -10 140 140",
     'buik': "40 110 120 120",
     'arm_l': "-10 120 90 140",
     'arm_r': "120 120 90 140",
     'been_l': "40 200 60 140",
     'been_r': "100 200 60 140",
+    'haar': "30 0 140 100",
+    'oog': "60 50 80 40",
+    'neus': "80 70 40 40",
+    'mond': "70 90 60 40",
+    'oor': "30 65 140 50",
   };
 
   return (
@@ -575,10 +611,14 @@ const KidSVG = ({
 
   const isDimmed = (puzzleId, targetId = puzzleId) => {
     if (isolatePart) return isolatePart !== puzzleId;
-    if (puzzleMode) return !placedPieces.includes(puzzleId);
+    if (puzzleMode) {
+      if (isTomHoofd && puzzleId === 'hoofd') return false;
+      return !placedPieces.includes(puzzleId);
+    }
     
     if (highlightedPart && !isIcon) {
-      if (puzzleId === 'hoofd' && targetId === 'hoofd' && ['hoofd', 'neus', 'mond', 'oor', 'haar'].includes(highlightedPart)) {
+      // De *outer* group (puzzleId: hoofd, targetId: hoofd) mag NOOIT verdwijnen als er een gezichtsdeel is aangeduid, want anders verdwijnen de actieve gezichtsdelen ook (omdat ze in deze group zitten).
+      if (puzzleId === 'hoofd' && targetId === 'hoofd' && ['hoofd', 'neus', 'mond', 'oor', 'haar', 'oog'].includes(highlightedPart)) {
         return false;
       }
       return highlightedPart !== targetId;
@@ -588,11 +628,11 @@ const KidSVG = ({
 
   const getStyle = (puzzleId, targetId = puzzleId) => {
     if (isolatePart && isolatePart !== puzzleId) return { display: 'none' };
-    if (puzzleMode && !placedPieces.includes(puzzleId)) {
+    if (puzzleMode && !placedPieces.includes(puzzleId) && !(isTomHoofd && puzzleId === 'hoofd')) {
       // Het silhouet in puzzel modus
       return { filter: 'brightness(0)', opacity: 0.08, pointerEvents: 'none' }; 
     }
-    return { opacity: isDimmed(puzzleId, targetId) ? 0.05 : 1, transition: 'all 0.4s ease' };
+    return { opacity: isDimmed(puzzleId, targetId) ? 0 : 1, transition: 'all 0.4s ease' };
   };
 
   const theme = {
@@ -603,7 +643,7 @@ const KidSVG = ({
     been: character === 'tom' ? '#1e3a8a' : character === 'lisa' ? '#fed7aa' : '#b45309',
     arm: character === 'tom' ? '#3b82f6' : character === 'lisa' ? '#fed7aa' : '#b45309',
     schoen: character === 'beer' ? '#78350f' : character === 'lisa' ? '#be185d' : '#f59e0b',
-    haar: character === 'beer' ? '#78350f' : character === 'lisa' ? '#d97706' : '#451a03',
+    haar: character === 'beer' ? '#78350f' : character === 'lisa' ? '#fcd34d' : '#451a03',
   };
 
   const renderInteractiveGroup = (targetId, puzzleId, origin, children, hitboxes) => {
@@ -622,6 +662,11 @@ const KidSVG = ({
     );
   };
 
+  // Voor tom_hoofd renderen we de body parts niet, maar het hoofd wél altijd zichtbaar/dim logic.
+  const isTomHoofd = character === 'tom_hoofd';
+
+  const getPartId = (id: string) => isTomHoofd ? id : 'hoofd';
+
   return (
     <svg 
       viewBox={viewBoxOverride || "0 -20 200 390"} 
@@ -632,7 +677,7 @@ const KidSVG = ({
     >
       
       {/* ================= ARMEN ================= */}
-      {renderInteractiveGroup('arm', 'arm_l', '40px 145px', (
+      {!isTomHoofd && renderInteractiveGroup('arm', 'arm_l', '40px 145px', (
         <>
           <rect x="25" y="145" width="28" height="85" rx="14" fill={theme.arm} transform="rotate(20 40 145)" />
           {/* Schaduw aan binnenkant arm */}
@@ -646,7 +691,7 @@ const KidSVG = ({
         </>
       ), <rect x="0" y="140" width="50" height="110" fill="transparent" /> )}
 
-      {renderInteractiveGroup('arm', 'arm_r', '160px 145px', (
+      {!isTomHoofd && renderInteractiveGroup('arm', 'arm_r', '160px 145px', (
         <>
           <rect x="147" y="145" width="28" height="85" rx="14" fill={theme.arm} transform="rotate(-20 160 145)" />
           {/* Schaduw aan binnenkant arm */}
@@ -662,7 +707,7 @@ const KidSVG = ({
 
 
       {/* ================= BENEN ================= */}
-      {renderInteractiveGroup('been', 'been_l', '75px 250px', (
+      {!isTomHoofd && renderInteractiveGroup('been', 'been_l', '75px 250px', (
         <>
           <rect x="65" y="210" width="30" height="110" rx="10" fill={theme.been} />
           {character !== 'beer' && <path d="M 75 260 Q 80 265 85 260" stroke="#000" strokeWidth="1.5" opacity="0.2" fill="none"/>}
@@ -674,7 +719,7 @@ const KidSVG = ({
         </>
       ), <rect x="50" y="210" width="50" height="140" fill="transparent" /> )}
 
-      {renderInteractiveGroup('been', 'been_r', '125px 250px', (
+      {!isTomHoofd && renderInteractiveGroup('been', 'been_r', '125px 250px', (
         <>
           <rect x="105" y="210" width="30" height="110" rx="10" fill={theme.been} />
           {character !== 'beer' && <path d="M 115 260 Q 120 265 125 260" stroke="#000" strokeWidth="1.5" opacity="0.2" fill="none"/>}
@@ -688,7 +733,7 @@ const KidSVG = ({
 
 
       {/* ================= BUIK ================= */}
-      {renderInteractiveGroup('buik', 'buik', '100px 180px', (
+      {!isTomHoofd && renderInteractiveGroup('buik', 'buik', '100px 180px', (
         <>
           {character === 'lisa' ? (
             <>
@@ -729,10 +774,10 @@ const KidSVG = ({
       {/* ================= HOOFD EN GEZICHT ================= */}
       <g style={getStyle('hoofd', 'hoofd')}>
         {/* HALS */}
-        <rect x="90" y="115" width="20" height="25" fill={theme.huid} />
+        <rect x="90" y="115" width="20" height="25" fill={theme.huid} style={getStyle('hoofd', getPartId('hoofd_basis'))} />
         
         {/* OREN */}
-        {renderInteractiveGroup('oor', 'hoofd', '100px 85px', (
+        {renderInteractiveGroup(getPartId('oor'), getPartId('oor'), '100px 85px', (
           character === 'beer' ? (
             <>
               <circle cx="45" cy="45" r="24" fill={theme.huid} />
@@ -757,72 +802,83 @@ const KidSVG = ({
         ))}
 
       {/* ================= HOOFD BASIS ================= */}
-        <g style={{ opacity: (!puzzleMode && !isIcon && highlightedPart && !['neus', 'mond', 'oor', 'haar'].includes(highlightedPart)) ? 0.05 : 1, transition: 'opacity 0.4s' }}>
-          <circle cx="100" cy="80" r="50" fill={theme.huid} />
-          {/* 3D highlights */}
-          <path d="M 55 60 Q 100 20 145 60 Q 100 10 55 60 Z" fill="#fff" opacity="0.2" />
-          {/* Kin schaduw */}
-          <path d="M 60 100 Q 100 135 140 100 Q 100 120 60 100 Z" fill={theme.huidShadow} opacity="0.4" />
-          <circle cx="65" cy="95" r="10" fill={theme.wang} opacity="0.6" style={{ filter: "blur(2px)" }} />
-          <circle cx="135" cy="95" r="10" fill={theme.wang} opacity="0.6" style={{ filter: "blur(2px)" }} />
-        </g>
+        {renderInteractiveGroup(getPartId('hoofd_basis'), 'hoofd', '100px 80px', (
+          <g>
+            <circle cx="100" cy="80" r="50" fill={theme.huid} />
+            {/* 3D highlights */}
+            <path d="M 55 60 Q 100 20 145 60 Q 100 10 55 60 Z" fill="#fff" opacity="0.2" />
+            {/* Kin schaduw */}
+            <path d="M 60 100 Q 100 135 140 100 Q 100 120 60 100 Z" fill={theme.huidShadow} opacity="0.4" />
+            <circle cx="65" cy="95" r="10" fill={theme.wang} opacity="0.6" style={{ filter: "blur(2px)" }} />
+            <circle cx="135" cy="95" r="10" fill={theme.wang} opacity="0.6" style={{ filter: "blur(2px)" }} />
+          </g>
+        ), <circle cx="100" cy="80" r="50" fill="transparent" />)}
 
         {/* HAAR */}
-        {renderInteractiveGroup('haar', 'hoofd', '100px 40px', (
+        {renderInteractiveGroup(getPartId('haar'), getPartId('haar'), '100px 40px', (
           <>
-            {character === 'tom' && (
+            {character === 'tom' || character === 'tom_hoofd' ? (
               <>
                 <path d="M 48 70 Q 70 10 100 15 Q 130 10 152 70 Q 140 20 100 5 Q 60 20 48 70 Z" fill={theme.haar} />
                 <path d="M 70 25 L 65 5 L 80 15 L 85 -5 L 100 10 L 110 -5 L 120 15 L 135 5 L 130 25 Z" fill={theme.haar} />
                 <path d="M 70 30 Q 100 15 130 30" stroke="#000" strokeWidth="2" opacity="0.2" fill="none" />
               </>
-            )}
-            {character === 'lisa' && (
+            ) : character === 'lisa' ? (
               <>
+                {/* Lange blonde lokken achterlangs en naast het gezicht, oren blijven vrij (die zitten op Y85) */}
+                <path d="M 40 70 Q 20 110 30 140 Q 55 120 45 110 Z" fill={theme.haar} />
+                <path d="M 160 70 Q 180 110 170 140 Q 145 120 155 110 Z" fill={theme.haar} />
+                {/* Basis haar bovenop */}
                 <path d="M 48 75 Q 70 20 100 20 Q 130 20 152 75 Q 140 30 100 30 Q 60 30 48 75 Z" fill={theme.haar} />
                 <path d="M 100 20 Q 110 40 120 30" stroke="#b45309" strokeWidth="2" fill="none" opacity="0.3"/>
-                <ellipse cx="25" cy="80" rx="20" ry="30" fill={theme.haar} transform="rotate(25 25 80)" />
-                <ellipse cx="175" cy="80" rx="20" ry="30" fill={theme.haar} transform="rotate(-25 175 80)" />
+                
+                {/* Kleine knotjes / staartjes aanzet */}
+                <ellipse cx="35" cy="70" rx="15" ry="25" fill={theme.haar} transform="rotate(25 35 70)" />
+                <ellipse cx="165" cy="70" rx="15" ry="25" fill={theme.haar} transform="rotate(-25 165 70)" />
+                
+                {/* Strikjes */}
                 <path d="M 35 60 L 20 50 L 25 70 Z" fill="#be185d" /><path d="M 35 60 L 50 50 L 45 70 Z" fill="#be185d" /><circle cx="35" cy="60" r="4" fill="#fbcfe8" />
                 <path d="M 165 60 L 150 50 L 155 70 Z" fill="#be185d" /><path d="M 165 60 L 180 50 L 175 70 Z" fill="#be185d" /><circle cx="165" cy="60" r="4" fill="#fbcfe8" />
               </>
-            )}
-            {character === 'beer' && (
-              <path d="M 85 35 Q 100 10 115 35 L 105 30 L 100 40 L 95 30 Z" fill={theme.haar} />
-            )}
+            ) : null}
           </>
         ), (
-          character === 'beer' ? (
-             <rect x="70" y="-10" width="60" height="45" fill="transparent" />
-          ) : character === 'lisa' ? (
+          character === 'lisa' ? (
              <>
-               <rect x="50" y="-10" width="100" height="50" fill="transparent" />
-               <rect x="10" y="40" width="40" height="60" fill="transparent" />
-               <rect x="150" y="40" width="40" height="60" fill="transparent" />
+               <rect x="20" y="-10" width="160" height="50" fill="transparent" />
+               <rect x="0" y="40" width="45" height="150" fill="transparent" />
+               <rect x="155" y="40" width="45" height="150" fill="transparent" />
              </>
           ) : (
              <rect x="40" y="-10" width="120" height="50" fill="transparent" />
           )
         ))}
 
-        {/* OGEN (Niet aanklikbaar, MET BLINK) */}
-        <g pointerEvents="none" className="animate-blink" style={{ transformOrigin: '100px 70px', opacity: (!puzzleMode && !isIcon && highlightedPart && !['neus', 'mond', 'oor', 'haar'].includes(highlightedPart)) ? 0.05 : 1, transition: 'opacity 0.4s' }}>
-          <circle cx="78" cy="70" r="11" fill="#fff" />
-          <circle cx="122" cy="70" r="11" fill="#fff" />
-          <circle cx="78" cy="70" r="6" fill="#000" />
-          <circle cx="122" cy="70" r="6" fill="#000" />
-          <circle cx="75" cy="67" r="2.5" fill="#fff" />
-          <circle cx="119" cy="67" r="2.5" fill="#fff" />
-          {/* Highlights in ogen */}
-          <circle cx="81" cy="72" r="1" fill="#fff" opacity="0.8" />
-          <circle cx="125" cy="72" r="1" fill="#fff" opacity="0.8" />
-          
-          {character === 'lisa' && <><path d="M 69 65 L 63 60 M 72 62 L 68 55 M 87 65 L 93 60 M 84 62 L 88 55" stroke="#000" strokeWidth="1.5" strokeLinecap="round" /><path d="M 131 65 L 137 60 M 128 62 L 132 55 M 113 65 L 107 60 M 116 62 L 112 55" stroke="#000" strokeWidth="1.5" strokeLinecap="round" /></>}
-          {character === 'tom' && <><path d="M 65 55 Q 78 50 88 55" stroke={theme.haar} strokeWidth="3" fill="none" strokeLinecap="round" /><path d="M 112 55 Q 122 50 135 55" stroke={theme.haar} strokeWidth="3" fill="none" strokeLinecap="round" /></>}
-        </g>
+        {/* OGEN (Met Blink, nu aanklikbaar) */}
+        {renderInteractiveGroup(getPartId('oog'), getPartId('oog'), '100px 70px', (
+          <g className="animate-blink">
+            <circle cx="78" cy="70" r="11" fill="#fff" />
+            <circle cx="122" cy="70" r="11" fill="#fff" />
+            <circle cx="78" cy="70" r="6" fill="#000" />
+            <circle cx="122" cy="70" r="6" fill="#000" />
+            <circle cx="75" cy="67" r="2.5" fill="#fff" />
+            <circle cx="119" cy="67" r="2.5" fill="#fff" />
+            {/* Highlights in ogen */}
+            <circle cx="81" cy="72" r="1" fill="#fff" opacity="0.8" />
+            <circle cx="125" cy="72" r="1" fill="#fff" opacity="0.8" />
+            
+            {character === 'lisa' && <><path d="M 69 65 L 63 60 M 72 62 L 68 55 M 87 65 L 93 60 M 84 62 L 88 55" stroke="#000" strokeWidth="1.5" strokeLinecap="round" /><path d="M 131 65 L 137 60 M 128 62 L 132 55 M 113 65 L 107 60 M 116 62 L 112 55" stroke="#000" strokeWidth="1.5" strokeLinecap="round" /></>}
+            {(character === 'tom' || character === 'tom_hoofd') && <><path d="M 65 55 Q 78 50 88 55" stroke={theme.haar} strokeWidth="3" fill="none" strokeLinecap="round" /><path d="M 112 55 Q 122 50 135 55" stroke={theme.haar} strokeWidth="3" fill="none" strokeLinecap="round" /></>}
+          </g>
+        ), (
+          <>
+            <rect x="62" y="55" width="30" height="30" fill="transparent" />
+            <rect x="106" y="55" width="30" height="30" fill="transparent" />
+          </>
+        ))}
 
         {/* NEUS */}
-        {renderInteractiveGroup('neus', 'hoofd', '100px 88px', (
+        {renderInteractiveGroup(getPartId('neus'), getPartId('neus'), '100px 88px', (
           character === 'beer' ? (
              <>
                <ellipse cx="100" cy="95" rx="22" ry="16" fill="#fcd34d" />
@@ -838,7 +894,7 @@ const KidSVG = ({
         ), <rect x="80" y="75" width="40" height="25" fill="transparent" /> )}
 
         {/* MOND */}
-        {renderInteractiveGroup('mond', 'hoofd', '100px 108px', (
+        {renderInteractiveGroup(getPartId('mond'), getPartId('mond'), '100px 108px', (
           character === 'beer' ? (
             <>
               <path d="M 100 95 L 100 108" stroke="#000" strokeWidth="2.5" />
